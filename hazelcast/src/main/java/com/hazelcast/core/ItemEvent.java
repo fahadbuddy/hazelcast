@@ -27,13 +27,9 @@ import java.util.EventObject;
 
 public class ItemEvent<E> extends EventObject {
 
-    private final E item;
+    protected E item;
     private final ItemEventType eventType;
     private final Member member;
-
-    public ItemEvent(String name, int eventType, E item, Member member) {
-        this(name, ItemEventType.getByType(eventType), item, member);
-    }
 
     public ItemEvent(String name, ItemEventType itemEventType, E item, Member member) {
         super(name);
@@ -52,18 +48,18 @@ public class ItemEvent<E> extends EventObject {
     }
 
     /**
-     * Returns the item related to event.
+     * Returns the item related to the event.
      *
-     * @return the item.
+     * @return the item related to the event.
      */
     public E getItem() {
         return item;
     }
 
     /**
-     * Returns the member fired this event.
+     * Returns the member that fired this event.
      *
-     * @return the member fired this event.
+     * @return the member that fired this event.
      */
     public Member getMember() {
         return member;

@@ -3,40 +3,21 @@
 ## Document Revision History
 
 |Chapter|Section|Description|
-|-------|-------|-----------|
-|[Chapter 1 - Introduction](#introduction)|[Configuring Hazelcast](#configuring-hazelcast)|The section 'Wildcard Configuration' previously placed under 'Configuration` chapter moved to this section with the heading 'Using Wildcard', also the content improved.|
-|[Chapter 3 - Distributed Data Structures](#distributed-data-structures)|[IdGenerator](#idgenerator), [ICountDownLatch](#icountdownlatch), [IAtomicReference](#iatomic-reference)| Added as new sections.|
-||[MultiMap](#multimap)| Section improved by adding information about how it is implemented and by providing configuration information.|
-||[Map](#map)|Eviction section improved by adding the detailed policy and parameter explanations. A subsection on how to evict particular map entries added *([Evicting Specific Entries](#evicting-specific-entries))*. Also [Map Overview](#map-overview) and [Backups](#backups) sections enhanced with "how it works" information. Added [Entry Listener](#entry-listener) and [Map Locks](#map-locks) as new sections.|
-||[Queue](#queue)|Section improved with new subsections.|
-|[Chapter 6 - Distributed Query](#distributed-query)||Query section improved by adding 'how it works' information. Also, [Continuous Query](#continuous-query) section re-written and sample codes added. [Aggregators](#aggregators) added as a new section.|
-|[Chapter 7 - Transactions](#transactions)|[XA Transactions](#xa-transactions)|Added as a new section.|
-||[Sample JBoss AS 7 - EAP 6 Web Application Configuration](#sample-JBoss-AS-7-EAP-6-web-application-configuration)| Added as a new section.|
-|[Chapter 8 - Integrated Clustering](#integrated-clustering)|[Tomcat Based Web Session Replication](#tomcat-based-web-session-replication)|Added as a new section (Enterprise Only feature).|
-|[Chapter 9 - Hazelcast JCache Implementation](#hazelcast-jcache-implementation)||Added as a new chapter.|
-|[Chapter 11 - Clients](#clients)|[Java Client](#java-client)|Client configuration related to AWS added.|
-|[Chapter 12 - Serialization](#serialization)||All sections under this chapter re-written and enhanced. Also added HazelcastInstanceAware, Stream & ByteArray Serializer, Serializable & Externalizable sections.|
-||[Null Portable Serialization](#null-portable-serialization)| Added as a new section.|
-|[Chapter 13 - Management](#management)|[Clustered JMX](#clustered-jmx)|Added as a new section explaining how to monitor the statistics of distributed objects from a JMX interface (Enterprise Only feature).|
-||[Cluster Utilities](#cluster-utilities)|[Member Attributes](#member-attributes) added as a new section.|
-||[Clustered REST](#clustered-rest)|Added as a new section (Enterprise Only feature).|
-|[Chapter 15 - Performance](#performance)|[Threading Model](#threading-model)| Added as a new section.|
-|[Chapter 16 - WAN](#wan)|[WAN Replication Queue Size](#wan-replication-queue-size)| Added as a new section (Enterprise only feature).|
-|[Chapter 17 - Configuration](#configuration)|[Configuring TCP/IP Cluster](#configuring-tcp-ip-cluster)| Section improved by adding more detailed configuration options.|
-||[EC2 Auto Discovery](#ec2-auto-discovery)|Section improved by adding AWSClient Class description, Debugging information and more detailed tag explanations.|
-||[Ports](#ports)|Added as a new section explaining how to configure ports which Hazelcast uses to communicate between nodes. Also existing "Restricting Outbound Ports" moved under this new section with the heading "Outbound Ports".|
-||[System Property](#system-property)|Updated by adding the descriptions of missing system properties.|
-|[Chapter 18 - FAQ](#frequently-asked-questions)||Updated with new questions.|
+|:-------|:-------|:-----------|
+|[Chapter 1 - Preface](#preface)||Added information on how to contribute to Hazelcast.|
+|[Chapter 4 - Hazelcast Clusters](#hazelcast-clusters)|[Creating Cluster Groups](#creating-cluster-groups)|Added as a new section explaining how to separate a Hazelcast cluster.|
+|[Chapter 12 - Integrated Clustering](#integrated-clustering)||Added introduction paragraphs.|
+|[Chapter 14 - Clients](#clients)||Added introduction paragraphs.|
+|[Chapter 18 - Performance](#performance)|[Hazelcast Performance on AWS](#hazelcast-performance-on-aws)|Added as a new section that provides best practices to improve the Hazelcast performance on Amazon Web Service.|
+|[Chapter 20 - Hazelcast Configuration](#hazelcast-configuration)||Improved by adding missing configuration elements and attributes. Added introduction paragraphs to the chapter.|
+|[Chapter 22 - FAQ](#frequently-asked-questions)||Added new questions/answers.|
+|[Chapter 23 - Glossary](#glossary)||Added new glossary items.|
+
+
+
 
 
 
 <br> </br>
-
-
-
-
-
-
-
 
 

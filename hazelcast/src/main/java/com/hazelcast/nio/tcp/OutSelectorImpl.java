@@ -16,20 +16,35 @@
 
 package com.hazelcast.nio.tcp;
 
-import com.hazelcast.nio.IOService;
+import com.hazelcast.logging.ILogger;
 
 import java.nio.channels.SelectionKey;
 
-final class OutSelectorImpl extends AbstractIOSelector {
+public final class OutSelectorImpl extends AbstractIOSelector {
 
-    OutSelectorImpl(IOService ioService, int id) {
-        super(ioService, ioService.getThreadPrefix() + "out-" + id);
+    // This field will be incremented by a single thread --> the OutSelectorImpl. It can be read by multiple threads.
+    private volatile long writeEvents;
+
+    public OutSelectorImpl(ThreadGroup threadGroup, String tname, ILogger logger, IOSelectorOutOfMemoryHandler oomeHandler) {
+        super(threadGroup, tname, logger, oomeHandler);
+    }
+
+    /**
+     * Returns the current number of write events that have been processed by this OutSelectorImpl.
+     *
+     * This method is thread-safe.
+     *
+     * @return the number of write events.
+     */
+    public long getWriteEvents() {
+        return writeEvents;
     }
 
     @Override
+    @edu.umd.cs.findbugs.annotations.SuppressWarnings({"VO_VOLATILE_INCREMENT" })
     protected void handleSelectionKey(SelectionKey sk) {
         if (sk.isValid() && sk.isWritable()) {
-            sk.interestOps(sk.interestOps() & ~SelectionKey.OP_WRITE);
+            writeEvents++;
             SelectionHandler handler = (SelectionHandler) sk.attachment();
             handler.handle();
         }

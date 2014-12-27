@@ -37,7 +37,7 @@ import java.util.concurrent.TimeUnit;
  * <p/>
  * <p><b>This class is <i>not</i> a general-purpose <tt>ConcurrentMap</tt> implementation! While this class implements
  * the <tt>Map</tt> interface, it intentionally violates <tt>Map's</tt> general contract, which mandates the
- * use of the <tt>equals</tt> method when comparing objects. Instead of the <tt>equals</tt> method this implementation
+ * use of the <tt>equals</tt> method when comparing objects. Instead of the <tt>equals</tt> method, this implementation
  * compares the serialized byte version of the objects.</b>
  * <p/>
  * <p>
@@ -52,7 +52,7 @@ import java.util.concurrent.TimeUnit;
  * </li>
  * <li>
  * <tt>get</tt> method returns a clone of original values, modifying the returned value does not change
- * the actual value in the map. One should put modified value back to make changes visible to all nodes.
+ * the actual value in the map. One should put the modified value back to make changes visible to all nodes.
  * For additional info see {@link IMap#get(Object)}.
  * </li>
  * <li>
@@ -147,7 +147,7 @@ public interface IMap<K, V>
      * <p/>
      * <p><b>Warning-2:</b></p>
      * <p>
-     * This method returns a clone of previous value, not the original (identically equal) value
+     * This method returns a clone of the previous value, not the original (identically equal) value
      * previously put into map.
      * </p>
      *
@@ -179,7 +179,7 @@ public interface IMap<K, V>
      * <p/>
      * <p>The map will not contain a mapping for the specified key once the
      * call returns.
-     *
+     * <p/>
      * <p><b>Warning:</b></p>
      * This method breaks the contract of EntryListener.
      * When an entry is removed by delete(), it fires an EntryEvent with a null oldValue.
@@ -195,7 +195,7 @@ public interface IMap<K, V>
     void delete(Object key);
 
     /**
-     * If this map has a MapStore this method flushes
+     * If this map has a MapStore, this method flushes
      * all the local dirty entries by calling MapStore.storeAll() and/or MapStore.deleteAll()
      */
     void flush();
@@ -247,7 +247,8 @@ public interface IMap<K, V>
      * This method clears the map and invokes {@link MapStore#deleteAll}deleteAll on MapStore which,
      * if connected to a database, will delete the records from that database.
      * <p/>
-     * Clear does not notify listeners.
+     * The MAP_CLEARED event is fired for any registered listeners.
+     * See {@link com.hazelcast.core.EntryListener#mapCleared(MapEvent)}.
      * <p/>
      * To clear a map without calling {@link MapStore#deleteAll} use {@link #evictAll}.
      * If you wish to clear the map only without calling deleteAll, use
@@ -297,9 +298,9 @@ public interface IMap<K, V>
      * // do some other stuff, when ready get the result
      * Object oldValue = future.get();
      * </code>
-     * Future.get() will block until the actual map.get() completes.
-     * If the application requires timely response,
-     * then Future.get(timeout, timeunit) can be used.
+     * Future.get() will block until the actual map.put() completes.
+     * If the application requires a timely response,
+     * then you can use Future.get(timeout, timeunit).
      * <code>
      * try{
      * Future future = map.putAsync(key, newValue);
@@ -349,7 +350,7 @@ public interface IMap<K, V>
      * This method uses <tt>hashCode</tt> and <tt>equals</tt> of binary form of
      * the <tt>key</tt>, not the actual implementations of <tt>hashCode</tt> and <tt>equals</tt>
      * defined in <tt>key</tt>'s class.
-     *
+     * <p/>
      * <p><b>Warning 2:</b></p>
      * Time resolution for TTL is seconds. Given TTL value is rounded to next closest second value.
      *
@@ -392,8 +393,8 @@ public interface IMap<K, V>
      * <p/>
      * <p><b>Warning-2:</b></p>
      * <p>
-     * This method returns a clone of previous value, not the original (identically equal) value
-     * previously put into map.
+     * This method returns a clone of the previous value, not the original (identically equal) value
+     * previously put into the map.
      * </p>
      *
      * @param key      key of the entry
@@ -407,10 +408,10 @@ public interface IMap<K, V>
     boolean tryRemove(K key, long timeout, TimeUnit timeunit);
 
     /**
-     * Tries to put the given key, value into this map within specified
+     * Tries to put the given key and value into this map within a specified
      * timeout value. If this method returns false, it means that
-     * the caller thread couldn't acquire the lock for the key within
-     * timeout duration, thus put operation is not successful.
+     * the caller thread could not acquire the lock for the key within the
+     * timeout duration, thus the put operation is not successful.
      * <p/>
      * <p><b>Warning:</b></p>
      * This method uses <tt>hashCode</tt> and <tt>equals</tt> of binary form of
@@ -441,9 +442,9 @@ public interface IMap<K, V>
      * This method returns a clone of previous value, not the original (identically equal) value
      * previously put into map.
      * </p>
-     *
+     * <p/>
      * <p><b>Warning 3:</b></p>
-     * Time resolution for TTL is seconds. Given TTL value is rounded to next closest second value.
+     * Time resolution for TTL is seconds. Given TTL value is rounded to the next closest second value.
      *
      * @param key      key of the entry
      * @param value    value of the entry
@@ -456,7 +457,7 @@ public interface IMap<K, V>
     V put(K key, V value, long ttl, TimeUnit timeunit);
 
     /**
-     * Same as {@link #put(K, V, long, TimeUnit)} but MapStore, if defined,
+     * Same as {@link #put(K, V, long, java.util.concurrent.TimeUnit)} but MapStore, if defined,
      * will not be called to store/persist the entry.  If ttl is 0, then
      * the entry lives forever.
      * <p/>
@@ -464,7 +465,7 @@ public interface IMap<K, V>
      * This method uses <tt>hashCode</tt> and <tt>equals</tt> of binary form of
      * the <tt>key</tt>, not the actual implementations of <tt>hashCode</tt> and <tt>equals</tt>
      * defined in <tt>key</tt>'s class.
-     *
+     * <p/>
      * <p><b>Warning 2:</b></p>
      * Time resolution for TTL is seconds. Given TTL value is rounded to next closest second value.
      *
@@ -509,7 +510,7 @@ public interface IMap<K, V>
      * This method returns a clone of previous value, not the original (identically equal) value
      * previously put into map.
      * </p>
-     *
+     * <p/>
      * <p><b>Warning 3:</b></p>
      * Time resolution for TTL is seconds. Given TTL value is rounded to next closest second value.
      *
@@ -583,7 +584,7 @@ public interface IMap<K, V>
      * This method uses <tt>hashCode</tt> and <tt>equals</tt> of binary form of
      * the <tt>key</tt>, not the actual implementations of <tt>hashCode</tt> and <tt>equals</tt>
      * defined in <tt>key</tt>'s class.
-     *
+     * <p/>
      * <p><b>Warning 2:</b></p>
      * Time resolution for TTL is seconds. Given TTL value is rounded to next closest second value.
      *
@@ -592,14 +593,13 @@ public interface IMap<K, V>
      * @param ttl      maximum time for this entry to stay in the map
      *                 0 means infinite.
      * @param timeunit time unit for the ttl
-     * @return old value of the entry
      * @throws NullPointerException if the specified key or value is null
      */
     void set(K key, V value, long ttl, TimeUnit timeunit);
 
     /**
      * Acquires the lock for the specified key.
-     * <p>If the lock is not available then
+     * <p>If the lock is not available, then
      * the current thread becomes disabled for thread scheduling
      * purposes and lies dormant until the lock has been acquired.
      * <p/>
@@ -647,9 +647,9 @@ public interface IMap<K, V>
      * the <tt>key</tt>, not the actual implementations of <tt>hashCode</tt> and <tt>equals</tt>
      * defined in <tt>key</tt>'s class.
      *
-     * @param key       key to lock.
-     * @param leaseTime time to wait before releasing the lock.
-     * @param timeUnit  unit of time to specify lease time.
+     * @param key       the key to lock
+     * @param leaseTime time to wait before releasing the lock
+     * @param timeUnit  unit of time to specify lease time
      * @throws NullPointerException if the specified key is null
      */
     void lock(K key, long leaseTime, TimeUnit timeUnit);
@@ -663,7 +663,7 @@ public interface IMap<K, V>
      * the <tt>key</tt>, not the actual implementations of <tt>hashCode</tt> and <tt>equals</tt>
      * defined in <tt>key</tt>'s class.
      *
-     * @param key key to lock to be checked.
+     * @param key the key that is checked for lock.
      * @return <tt>true</tt> if lock is acquired, <tt>false</tt> otherwise.
      * @throws NullPointerException if the specified key is null
      */
@@ -679,7 +679,7 @@ public interface IMap<K, V>
      * the <tt>key</tt>, not the actual implementations of <tt>hashCode</tt> and <tt>equals</tt>
      * defined in <tt>key</tt>'s class.
      *
-     * @param key key to lock.
+     * @param key the key to lock.
      * @return <tt>true</tt> if lock is acquired, <tt>false</tt> otherwise.
      * @throws NullPointerException if the specified key is null
      */
@@ -724,7 +724,7 @@ public interface IMap<K, V>
      * the <tt>key</tt>, not the actual implementations of <tt>hashCode</tt> and <tt>equals</tt>
      * defined in <tt>key</tt>'s class.
      *
-     * @param key key to lock.
+     * @param key the key to lock.
      * @throws NullPointerException         if the specified key is null
      * @throws IllegalMonitorStateException if the current thread does not hold this lock
      */
@@ -732,7 +732,7 @@ public interface IMap<K, V>
 
     /**
      * Releases the lock for the specified key regardless of the lock owner.
-     * It always successfully unlocks the key, never blocks
+     * It always successfully unlocks the key, never blocks,
      * and returns immediately.
      * <p/>
      * <p><b>Warning:</b></p>
@@ -740,13 +740,13 @@ public interface IMap<K, V>
      * the <tt>key</tt>, not the actual implementations of <tt>hashCode</tt> and <tt>equals</tt>
      * defined in <tt>key</tt>'s class.
      *
-     * @param key key to lock.
+     * @param key the key to lock.
      * @throws NullPointerException if the specified key is null
      */
     void forceUnlock(K key);
 
     /**
-     * Adds a local entry listener for this map. Added listener will be only
+     * Adds a local entry listener for this map. The added listener will be only
      * listening for the events (add/remove/update/evict) of the locally owned entries.
      * <p/>
      * Note that entries in distributed map are partitioned across
@@ -760,12 +760,13 @@ public interface IMap<K, V>
      * other nodes for load balancing and/or membership change.
      *
      * @param listener entry listener
+     * @return A UUID.randomUUID().toString() which is used as a key to remove the listener.
      * @see #localKeySet()
      */
     String addLocalEntryListener(EntryListener<K, V> listener);
 
     /**
-     * Adds a local entry listener for this map. Added listener will be only
+     * Adds a local entry listener for this map. The added listener will be only
      * listening for the events (add/remove/update/evict) of the locally owned entries.
      * Listener will get notified for map add/remove/update/evict events filtered by given predicate.
      *
@@ -773,12 +774,12 @@ public interface IMap<K, V>
      * @param predicate    predicate for filtering entries
      * @param includeValue <tt>true</tt> if <tt>EntryEvent</tt> should
      *                     contain the value.
-     * @return
+     * @return A UUID.randomUUID().toString() which is used as a key to remove the listener.
      */
     String addLocalEntryListener(EntryListener<K, V> listener, Predicate<K, V> predicate, boolean includeValue);
 
     /**
-     * Adds a local entry listener for this map. Added listener will be only
+     * Adds a local entry listener for this map. The added listener will be only
      * listening for the events (add/remove/update/evict) of the locally owned entries.
      * Listener will get notified for map add/remove/update/evict events filtered by given predicate.
      *
@@ -787,7 +788,7 @@ public interface IMap<K, V>
      * @param key          key to listen
      * @param includeValue <tt>true</tt> if <tt>EntryEvent</tt> should
      *                     contain the value.
-     * @return
+     * @return A UUID.randomUUID().toString() which is used as a key to remove the listener.
      */
     String addLocalEntryListener(EntryListener<K, V> listener, Predicate<K, V> predicate, K key, boolean includeValue);
 
@@ -805,7 +806,7 @@ public interface IMap<K, V>
      * Removes the given interceptor for this map. So it will not intercept operations anymore.
      * <p/>
      *
-     * @param id registration id of map interceptor
+     * @param id registration id of the map interceptor
      */
     void removeInterceptor(String id);
 
@@ -813,9 +814,10 @@ public interface IMap<K, V>
      * Adds an entry listener for this map. Listener will get notified
      * for all map add/remove/update/evict events.
      *
-     * @param listener     entry listener
+     * @param listener     the added entry listener for this map
      * @param includeValue <tt>true</tt> if <tt>EntryEvent</tt> should
      *                     contain the value.
+     * @return A UUID.randomUUID().toString() which is used as a key to remove the listener.
      */
     String addEntryListener(EntryListener<K, V> listener, boolean includeValue);
 
@@ -838,10 +840,11 @@ public interface IMap<K, V>
      * the <tt>key</tt>, not the actual implementations of <tt>hashCode</tt> and <tt>equals</tt>
      * defined in <tt>key</tt>'s class.
      *
-     * @param listener     entry listener
+     * @param listener     specified entry listener
      * @param key          key to listen
      * @param includeValue <tt>true</tt> if <tt>EntryEvent</tt> should
      *                     contain the value.
+     * @return A UUID.randomUUID().toString() which is used as a key to remove the listener.
      * @throws NullPointerException if the specified key is null
      */
     String addEntryListener(EntryListener<K, V> listener, K key, boolean includeValue);
@@ -850,10 +853,11 @@ public interface IMap<K, V>
      * Adds an continuous entry listener for this map. Listener will get notified
      * for map add/remove/update/evict events filtered by given predicate.
      *
-     * @param listener     entry listener
+     * @param listener     the added continuous entry listener for this map
      * @param predicate    predicate for filtering entries
      * @param includeValue <tt>true</tt> if <tt>EntryEvent</tt> should
      *                     contain the value.
+     * @return A UUID.randomUUID().toString() which is used as a key to remove the listener.
      */
     String addEntryListener(EntryListener<K, V> listener, Predicate<K, V> predicate, boolean includeValue);
 
@@ -861,11 +865,12 @@ public interface IMap<K, V>
      * Adds an continuous entry listener for this map. Listener will get notified
      * for map add/remove/update/evict events filtered by given predicate.
      *
-     * @param listener     entry listener
+     * @param listener     the continuous entry listener for this map
      * @param predicate    predicate for filtering entries
      * @param key          key to listen
      * @param includeValue <tt>true</tt> if <tt>EntryEvent</tt> should
      *                     contain the value.
+     * @return A UUID.randomUUID().toString() which is used as a key to remove the listener.
      */
     String addEntryListener(EntryListener<K, V> listener, Predicate<K, V> predicate, K key, boolean includeValue);
 
@@ -883,7 +888,7 @@ public interface IMap<K, V>
      * the <tt>key</tt>, not the actual implementations of <tt>hashCode</tt> and <tt>equals</tt>
      * defined in <tt>key</tt>'s class.
      *
-     * @param key key of the entry
+     * @param key the key of the entry
      * @return <tt>EntryView</tt> of the specified key
      * @throws NullPointerException if the specified key is null
      * @see EntryView
@@ -901,7 +906,7 @@ public interface IMap<K, V>
      * the <tt>key</tt>, not the actual implementations of <tt>hashCode</tt> and <tt>equals</tt>
      * defined in <tt>key</tt>'s class.
      *
-     * @param key key to evict
+     * @param key the specified key to evict from this map
      * @return <tt>true</tt> if the key is evicted, <tt>false</tt> otherwise.
      * @throws NullPointerException if the specified key is null
      */
@@ -914,6 +919,7 @@ public interface IMap<K, V>
      * If you do want to deleteAll to be called use the {@link #clear()} method.
      * <p/>
      * The EVICT_ALL event is fired for any registered listeners.
+     * See {@link com.hazelcast.core.EntryListener#mapEvicted(MapEvent)} .
      *
      * @see #clear()
      * @since 3.3
@@ -957,7 +963,7 @@ public interface IMap<K, V>
      * The set is <b>NOT</b> backed by the map,
      * so changes to the map are <b>NOT</b> reflected in the set, and vice-versa.
      *
-     * @param predicate query criteria
+     * @param predicate specified query criteria
      * @return result key set of the query
      */
     Set<K> keySet(Predicate predicate);
@@ -972,7 +978,7 @@ public interface IMap<K, V>
      * The set is <b>NOT</b> backed by the map,
      * so changes to the map are <b>NOT</b> reflected in the set, and vice-versa.
      *
-     * @param predicate query criteria
+     * @param predicate specified query criteria
      * @return result entry set of the query
      */
 
@@ -988,7 +994,7 @@ public interface IMap<K, V>
      * The collection is <b>NOT</b> backed by the map,
      * so changes to the map are <b>NOT</b> reflected in the collection, and vice-versa.
      *
-     * @param predicate query criteria
+     * @param predicate specified query criteria
      * @return result value collection of the query
      */
 
@@ -1026,7 +1032,7 @@ public interface IMap<K, V>
      * The set is <b>NOT</b> backed by the map,
      * so changes to the map are <b>NOT</b> reflected in the set, and vice-versa.
      *
-     * @param predicate query criteria
+     * @param predicate specified query criteria
      * @return keys of matching locally owned entries.
      */
     Set<K> localKeySet(Predicate predicate);
@@ -1070,7 +1076,7 @@ public interface IMap<K, V>
      * Until the index finishes being created, any searches for the attribute will use a full Map scan,
      * thus avoiding using a partially built index and returning incorrect results.
      *
-     * @param attribute attribute of value
+     * @param attribute index attribute of value
      * @param ordered   <tt>true</tt> if index should be ordered,
      *                  <tt>false</tt> otherwise.
      */
@@ -1156,7 +1162,7 @@ public interface IMap<K, V>
      * @param aggregation     the aggregation that is being executed against the map
      * @param <SuppliedValue> the final type emitted from the supplier
      * @param <Result>        the resulting aggregation value type
-     * @return Returns the aggregated value
+     * @return the aggregated value
      */
     <SuppliedValue, Result> Result aggregate(Supplier<K, V, SuppliedValue> supplier,
                                              Aggregation<K, SuppliedValue, Result> aggregation);
@@ -1171,7 +1177,7 @@ public interface IMap<K, V>
      * @param jobTracker      the {@link com.hazelcast.mapreduce.JobTracker} instance to execute the aggregation
      * @param <SuppliedValue> the final type emitted from the supplier
      * @param <Result>        the resulting aggregation value type
-     * @return Returns the aggregated value
+     * @return the aggregated value
      */
     <SuppliedValue, Result> Result aggregate(Supplier<K, V, SuppliedValue> supplier,
                                              Aggregation<K, SuppliedValue, Result> aggregation,

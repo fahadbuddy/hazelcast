@@ -29,7 +29,6 @@ import com.hazelcast.test.AssertTask;
 import com.hazelcast.test.HazelcastParallelClassRunner;
 import com.hazelcast.test.HazelcastTestSupport;
 import com.hazelcast.test.TestHazelcastInstanceFactory;
-import com.hazelcast.test.annotation.ProblematicTest;
 import com.hazelcast.test.annotation.QuickTest;
 import org.junit.Before;
 import org.junit.Test;
@@ -37,12 +36,16 @@ import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(HazelcastParallelClassRunner.class)
@@ -92,6 +95,29 @@ public class ListenerTest extends HazelcastTestSupport {
         int k = 3;
         putDummyData(map1, k);
         checkCountWithExpected(k * 3, 0, k * 2);
+    }
+
+    @Test
+    public void testEntryEventGetMemberNotNull() throws Exception {
+        TestHazelcastInstanceFactory nodeFactory = createHazelcastInstanceFactory(2);
+        HazelcastInstance h1 = nodeFactory.newHazelcastInstance();
+        HazelcastInstance h2 = nodeFactory.newHazelcastInstance();
+        final String mapName = randomMapName();
+        final IMap<Object, Object> map = h1.getMap(mapName);
+        final IMap<Object, Object> map2 = h2.getMap(mapName);
+        final CountDownLatch latch = new CountDownLatch(1);
+        map.addEntryListener(new EntryAdapter<Object, Object>() {
+            @Override
+            public void entryAdded(EntryEvent<Object, Object> event) {
+                assertNotNull(event.getMember());
+                latch.countDown();
+            }
+        }, false);
+        final String key = generateKeyOwnedBy(h2);
+        final String value = randomString();
+        map2.put(key, value);
+        h2.getLifecycleService().shutdown();
+        assertOpenEventually(latch);
     }
 
     @Test
@@ -197,31 +223,25 @@ public class ListenerTest extends HazelcastTestSupport {
      */
     @Test
     public void replaceFiresUpdatedEvent() throws InterruptedException {
-        TestHazelcastInstanceFactory nodeFactory = createHazelcastInstanceFactory(2);
-        Config cfg = new Config();
-        HazelcastInstance h1 = nodeFactory.newHazelcastInstance(cfg);
-        IMap<Object, Object> map = h1.getMap("map");
-        map.put(1, 1);
-        final AtomicInteger updateCount = new AtomicInteger(0);
-        final AtomicInteger addCount = new AtomicInteger(0);
-        map.addEntryListener(new EntryAdapter<Object, Object>() {
-            @Override
-            public void entryAdded(EntryEvent<Object, Object> event) {
-                addCount.incrementAndGet();
-            }
+        final AtomicInteger entryUpdatedEventCount = new AtomicInteger(0);
 
+        HazelcastInstance node = createHazelcastInstance();
+        IMap<Integer, Integer> map = node.getMap(randomMapName());
+        map.put(1, 1);
+
+        map.addEntryListener(new EntryAdapter<Integer, Integer>() {
             @Override
-            public void entryUpdated(EntryEvent<Object, Object> event) {
-                updateCount.incrementAndGet();
+            public void entryUpdated(EntryEvent<Integer, Integer> event) {
+                entryUpdatedEventCount.incrementAndGet();
             }
         }, true);
-        map.replace(1, 1, 2);  // should succeed and fire entryUpdated() exactly once
-        map.replace(1, 1, 2);  // should fail
+
+        map.replace(1, 1, 2);
+
         assertTrueEventually(new AssertTask() {
             @Override
             public void run() {
-                assertEquals(addCount.get(), 0);
-                assertEquals(updateCount.get(), 1);
+                assertEquals(1, entryUpdatedEventCount.get());
             }
         });
     }
@@ -243,7 +263,7 @@ public class ListenerTest extends HazelcastTestSupport {
                 addLatch.countDown();
             }
 
-           @Override
+            @Override
             public void entryUpdated(EntryEvent<Object, Object> event) {
                 updateLatch.countDown();
             }
@@ -359,7 +379,7 @@ public class ListenerTest extends HazelcastTestSupport {
             public void run() {
 
                 for (int i = 0; i < replaceTotal; i++) {
-                    assertEquals( oldVal, map.get(i));
+                    assertEquals(oldVal, map.get(i));
                 }
 
                 assertEquals(putTotal, listener.addCount.get());
@@ -368,8 +388,57 @@ public class ListenerTest extends HazelcastTestSupport {
         });
     }
 
+    /**
+     * test for issue 3198
+     */
     @Test
-    @Category(ProblematicTest.class)
+    public void testEntryListenerEvent_getValueWhenEntryRemoved() {
+        TestHazelcastInstanceFactory nodeFactory = createHazelcastInstanceFactory(1);
+        HazelcastInstance h1 = nodeFactory.newHazelcastInstance(new Config());
+        IMap<String, String> map = h1.getMap(name);
+        final Object[] value = new Object[1];
+        final Object[] oldValue = new Object[1];
+        final CountDownLatch latch = new CountDownLatch(1);
+
+        map.addEntryListener(new EntryAdapter<String, String>() {
+            public void entryRemoved(EntryEvent<String, String> event) {
+                value[0] = event.getValue();
+                oldValue[0] = event.getOldValue();
+                latch.countDown();
+            }
+        }, true);
+
+        map.put("key", "value");
+        map.remove("key");
+        assertOpenEventually(latch);
+        assertNull(value[0]);
+        assertEquals("value", oldValue[0]);
+    }
+
+    @Test
+    public void testEntryListenerEvent_getValueWhenEntryEvicted() {
+        TestHazelcastInstanceFactory nodeFactory = createHazelcastInstanceFactory(1);
+        HazelcastInstance h1 = nodeFactory.newHazelcastInstance(new Config());
+        IMap<String, String> map = h1.getMap(name);
+        final Object[] value = new Object[1];
+        final Object[] oldValue = new Object[1];
+        final CountDownLatch latch = new CountDownLatch(1);
+
+        map.addEntryListener(new EntryAdapter<String, String>() {
+            public void entryEvicted(EntryEvent<String, String> event) {
+                value[0] = event.getValue();
+                oldValue[0] = event.getOldValue();
+                latch.countDown();
+            }
+        }, true);
+
+        map.put("key", "value", 1, TimeUnit.SECONDS);
+        assertOpenEventually(latch);
+        assertNull(value[0]);
+        assertEquals("value", oldValue[0]);
+    }
+
+    @Test
     public void testEntryListenerEvent_withMapReplaceSuccess() throws Exception {
         final int instanceCount = 1;
         final HazelcastInstance instance = createHazelcastInstanceFactory(instanceCount).newInstances(new Config())[0];
@@ -404,6 +473,41 @@ public class ListenerTest extends HazelcastTestSupport {
             }
         });
     }
+
+    /**
+     * test for issue 4037
+     */
+    @Test
+    public void testEntryEvent_includesOldValue_afterRemoveIfSameOperation() {
+        final String mapName = randomMapName();
+        final HazelcastInstance node = createHazelcastInstance();
+        final IMap<String, String> map = node.getMap(mapName);
+
+        final CountDownLatch latch = new CountDownLatch(1);
+
+        final String key = "key";
+        final String value = "value";
+
+        final ConcurrentMap<String, String> resultHolder = new ConcurrentHashMap<String, String>(1);
+
+        map.addEntryListener(new EntryAdapter<String, String>() {
+            public void entryRemoved(EntryEvent<String, String> event) {
+                final String oldValue = event.getOldValue();
+                resultHolder.put(key, oldValue);
+                latch.countDown();
+            }
+        }, true);
+
+        map.put(key, value);
+
+        map.remove(key, value);
+
+        assertOpenEventually(latch);
+
+        final String oldValueFromEntryEvent = resultHolder.get(key);
+        assertEquals(value, oldValueFromEntryEvent);
+    }
+
 
 
     private Predicate<String, String> matchingPredicate() {
@@ -449,7 +553,8 @@ public class ListenerTest extends HazelcastTestSupport {
         public final AtomicLong updateCount = new AtomicLong();
         public final AtomicLong evictCount = new AtomicLong();
 
-        public CounterEntryListener( ) { }
+        public CounterEntryListener() {
+        }
 
         @Override
         public void entryAdded(EntryEvent<Object, Object> objectObjectEntryEvent) {

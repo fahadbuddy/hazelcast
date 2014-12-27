@@ -39,6 +39,8 @@ import com.hazelcast.transaction.TransactionManagerService;
 import com.hazelcast.transaction.TransactionOptions;
 import com.hazelcast.transaction.TransactionalTask;
 import com.hazelcast.util.ExceptionUtil;
+
+import javax.transaction.xa.Xid;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -53,9 +55,12 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import javax.transaction.xa.Xid;
+import java.util.logging.Level;
 
 import static com.hazelcast.transaction.impl.Transaction.State;
+import static com.hazelcast.util.FutureUtil.ExceptionHandler;
+import static com.hazelcast.util.FutureUtil.logAllExceptions;
+import static com.hazelcast.util.FutureUtil.waitWithDeadline;
 
 public class TransactionManagerServiceImpl implements TransactionManagerService, ManagedService,
         MembershipAwareService, ClientAwareService {
@@ -63,6 +68,8 @@ public class TransactionManagerServiceImpl implements TransactionManagerService,
     public static final String SERVICE_NAME = "hz:core:txManagerService";
 
     public static final int RECOVER_TIMEOUT = 5000;
+
+    private final ExceptionHandler finalizeExceptionHandler;
 
     private final NodeEngineImpl nodeEngine;
 
@@ -76,7 +83,8 @@ public class TransactionManagerServiceImpl implements TransactionManagerService,
 
     public TransactionManagerServiceImpl(NodeEngineImpl nodeEngine) {
         this.nodeEngine = nodeEngine;
-        logger = nodeEngine.getLogger(TransactionManagerService.class);
+        this.logger = nodeEngine.getLogger(TransactionManagerService.class);
+        this.finalizeExceptionHandler = logAllExceptions(logger, "Error while rolling-back tx!", Level.WARNING);
     }
 
     public String getGroupName() {
@@ -214,13 +222,9 @@ public class TransactionManagerServiceImpl implements TransactionManagerService,
                 Future f = operationService.invokeOnTarget(SERVICE_NAME, op, member.getAddress());
                 futures.add(f);
             }
-            for (Future future : futures) {
-                try {
-                    future.get(TransactionOptions.getDefault().getTimeoutMillis(), TimeUnit.MILLISECONDS);
-                } catch (Exception e) {
-                    logger.warning("Error while rolling-back tx!");
-                }
-            }
+
+            long timeoutMillis = TransactionOptions.getDefault().getTimeoutMillis();
+            waitWithDeadline(futures, timeoutMillis, TimeUnit.MILLISECONDS, finalizeExceptionHandler);
         } else {
             if (log.state == State.COMMITTING && log.xid != null) {
                 logger.warning("This log is XA Managed " + log);
@@ -410,6 +414,18 @@ public class TransactionManagerServiceImpl implements TransactionManagerService,
             this.timeoutMillis = timeoutMillis;
             this.startTime = startTime;
             this.xid = xid;
+        }
+
+        @Override
+        public String toString() {
+            return "TxBackupLog{"
+                    + "txLogs=" + txLogs
+                    + ", callerUuid='" + callerUuid + '\''
+                    + ", timeoutMillis=" + timeoutMillis
+                    + ", startTime=" + startTime
+                    + ", xid=" + xid
+                    + ", state=" + state
+                    + '}';
         }
     }
 }

@@ -22,7 +22,6 @@ import com.hazelcast.nio.Address;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.DataSerializable;
-import com.hazelcast.util.Clock;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -39,7 +38,6 @@ public class PartitionRuntimeState implements DataSerializable {
 
     private final Collection<ShortPartitionInfo> partitionInfos = new LinkedList<ShortPartitionInfo>();
     private ILogger logger;
-    private long masterTime = Clock.currentTimeMillis();
     private int version;
     private Collection<MigrationInfo> completedMigrations;
     private Address endpoint;
@@ -51,9 +49,8 @@ public class PartitionRuntimeState implements DataSerializable {
                                  Collection<MemberInfo> memberInfos,
                                  InternalPartition[] partitions,
                                  Collection<MigrationInfo> migrationInfos,
-                                 long masterTime, int version) {
+                                 int version) {
         this.logger = logger;
-        this.masterTime = masterTime;
         this.version = version;
         final Map<Address, Integer> addressIndexes = new HashMap<Address, Integer>(memberInfos.size());
         int memberIndex = 0;
@@ -82,7 +79,7 @@ public class PartitionRuntimeState implements DataSerializable {
                     Integer knownIndex = addressIndexes.get(address);
 
                     if (knownIndex == null && index == 0) {
-                        unmatchAddresses.add(address + ":" + partition);
+                        unmatchAddresses.add(address + " -> " + partition);
                     }
                     if (knownIndex == null) {
                         partitionInfo.addressIndexes[index] = -1;
@@ -95,10 +92,11 @@ public class PartitionRuntimeState implements DataSerializable {
         }
 
         if (!unmatchAddresses.isEmpty()) {
-            //it can happen that the master address at any given moment is not known. Perhaps because
-            //of migration, perhaps because the system has not yet been initialized.
+            // it can happen that the primary address at any given moment is not known,
+            // most probably because master node has updated/published the partition table yet
+            // or partition table update is not received yet.
             logger.warning("Unknown owner addresses in partition state! "
-                    + unmatchAddresses);
+                    + "(Probably they have recently joined to or left the cluster.) " + unmatchAddresses);
         }
     }
 
@@ -125,10 +123,6 @@ public class PartitionRuntimeState implements DataSerializable {
         return members;
     }
 
-    public long getMasterTime() {
-        return masterTime;
-    }
-
     public Address getEndpoint() {
         return endpoint;
     }
@@ -143,7 +137,12 @@ public class PartitionRuntimeState implements DataSerializable {
 
     @Override
     public void readData(ObjectDataInput in) throws IOException {
-        masterTime = in.readLong();
+        // `masterTime` field is removed because it's not used anymore.
+        // Keeping an empty `in.readLong()` call here to not to break
+        // serialization of this class.
+        // masterTime = in.readLong();
+        in.readLong();
+
         version = in.readInt();
         int size = in.readInt();
         final Map<Address, Integer> addressIndexes = new HashMap<Address, Integer>(size);
@@ -174,7 +173,12 @@ public class PartitionRuntimeState implements DataSerializable {
 
     @Override
     public void writeData(ObjectDataOutput out) throws IOException {
-        out.writeLong(masterTime);
+        // `masterTime` field is removed because it's not used anymore.
+        // Added an empty `out.writeLong(0L)` call here to not to break
+        // serialization of this class.
+        // out.writeLong(masterTime);
+        out.writeLong(0L);
+
         out.writeInt(version);
         int memberSize = members.size();
         out.writeInt(memberSize);

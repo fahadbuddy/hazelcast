@@ -17,18 +17,22 @@
 package com.hazelcast.test;
 
 import com.hazelcast.config.Config;
+import com.hazelcast.core.Cluster;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.Member;
 import com.hazelcast.core.Partition;
 import com.hazelcast.core.PartitionService;
+import com.hazelcast.instance.HazelcastInstanceFactory;
 import com.hazelcast.instance.Node;
 import com.hazelcast.instance.TestUtil;
+import com.hazelcast.partition.InternalPartitionService;
 import org.junit.After;
 import org.junit.ComparisonFailure;
 
 import java.util.Collection;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -40,7 +44,7 @@ import static org.junit.Assert.fail;
 
 public abstract class HazelcastTestSupport {
 
-    private static final int ASSERT_TRUE_EVENTUALLY_TIMEOUT;
+    public static final int ASSERT_TRUE_EVENTUALLY_TIMEOUT;
 
     static {
         System.setProperty("hazelcast.repmap.hooks.allowed", "true");
@@ -49,6 +53,15 @@ public abstract class HazelcastTestSupport {
     }
 
     private TestHazelcastInstanceFactory factory;
+
+    @After
+    public final void shutdownNodeFactory() {
+        final TestHazelcastInstanceFactory f = factory;
+        if (f != null) {
+            factory = null;
+            f.terminateAll();
+        }
+    }
 
     public static String generateRandomString(int length) {
         StringBuffer sb = new StringBuffer(length);
@@ -105,7 +118,7 @@ public abstract class HazelcastTestSupport {
         assertTrueEventually(new AssertTask() {
             @Override
             public void run() {
-                assertEquals("the size of the collection is not correct", expectedSize, c.size());
+                assertEquals("the size of the collection is not correct: found-content:" + c, expectedSize, c.size());
             }
         }, timeoutSeconds);
     }
@@ -123,6 +136,10 @@ public abstract class HazelcastTestSupport {
         }, timeoutSeconds);
     }
 
+    public static void assertClusterSize(int expectedSize, HazelcastInstance instance) {
+        assertEquals("Cluster size is not correct", expectedSize, instance.getCluster().getMembers().size());
+    }
+
     public static void assertClusterSizeEventually(final int expectedSize, final HazelcastInstance instance) {
         assertClusterSizeEventually(expectedSize, instance, ASSERT_TRUE_EVENTUALLY_TIMEOUT);
     }
@@ -135,7 +152,6 @@ public abstract class HazelcastTestSupport {
             }
         }, timeoutSeconds);
     }
-
 
     public static void assertJoinable(long timeoutSeconds, Thread... threads) {
         try {
@@ -264,11 +280,31 @@ public abstract class HazelcastTestSupport {
         }
     }
 
+    /**
+     * This method executes the normal assertEquals with expected and actual values.
+     * In addition it formats the given string with those values to provide a good assert message.
+     *
+     * @param message     assert message which is formatted with expected and actual values
+     * @param expected    expected value which is used for assert
+     * @param actual      actual value which is used for assert
+     */
+    public static void assertEqualsStringFormat(String message, Object expected, Object actual) {
+        assertEquals(String.format(message, expected, actual), expected, actual);
+    }
+
     protected final TestHazelcastInstanceFactory createHazelcastInstanceFactory(int nodeCount) {
         if (factory != null) {
             throw new IllegalStateException("Node factory is already created!");
         }
         return factory = new TestHazelcastInstanceFactory(nodeCount);
+    }
+
+
+    protected final TestHazelcastInstanceFactory createHazelcastInstanceFactory(String... addresses) {
+        if (factory != null) {
+            throw new IllegalStateException("Node factory is already created!");
+        }
+        return factory = new TestHazelcastInstanceFactory(addresses);
     }
 
     public HazelcastInstance createHazelcastInstance(Config config) {
@@ -277,15 +313,6 @@ public abstract class HazelcastTestSupport {
 
     public HazelcastInstance createHazelcastInstance() {
         return createHazelcastInstance(new Config());
-    }
-
-    @After
-    public final void shutdownNodeFactory() {
-        final TestHazelcastInstanceFactory f = factory;
-        if (f != null) {
-            factory = null;
-            f.shutdownAll();
-        }
     }
 
     public static Node getNode(HazelcastInstance hz) {
@@ -301,26 +328,52 @@ public abstract class HazelcastTestSupport {
     }
 
     public static String generateKeyOwnedBy(HazelcastInstance instance) {
-        final Member localMember = instance.getCluster().getLocalMember();
+        return generateKeyInternal(instance, true);
+    }
+
+    public static String generateKeyNotOwnedBy(HazelcastInstance instance) {
+        return generateKeyInternal(instance, false);
+    }
+
+    /**
+     * Generates a key according to given reference instance by checking partition ownership for it.
+     *
+     * @param instance         reference instance for key generation.
+     * @param generateOwnedKey <code>true</code> if we want a key which is owned by the given instance, otherwise
+     *                         set to <code>false</code> which means generated key will not be owned by the given instance.
+     * @return generated string.
+     */
+    private static String generateKeyInternal(HazelcastInstance instance, boolean generateOwnedKey) {
+        final Cluster cluster = instance.getCluster();
+        checkMemberCount(generateOwnedKey, cluster);
+
+        final Member localMember = cluster.getLocalMember();
         final PartitionService partitionService = instance.getPartitionService();
         for (; ; ) {
-            String id = UUID.randomUUID().toString();
-            Partition partition = partitionService.getPartition(id);
-            if (localMember.equals(partition.getOwner())) {
+            final String id = randomString();
+            final Partition partition = partitionService.getPartition(id);
+            if (comparePartitionOwnership(generateOwnedKey, localMember, partition)) {
                 return id;
             }
         }
     }
 
-    public static String generateKeyNotOwnedBy(HazelcastInstance instance) {
-        final Member localMember = instance.getCluster().getLocalMember();
-        final PartitionService partitionService = instance.getPartitionService();
-        for (; ; ) {
-            String id = UUID.randomUUID().toString();
-            Partition partition = partitionService.getPartition(id);
-            if (!localMember.equals(partition.getOwner())) {
-                return id;
-            }
+    private static void checkMemberCount(boolean generateOwnedKey, Cluster cluster) {
+        if (generateOwnedKey) {
+            return;
+        }
+        final Set<Member> members = cluster.getMembers();
+        if (members.size() < 2) {
+            throw new UnsupportedOperationException("Cluster has only one member, you can not generate a `not owned key`");
+        }
+    }
+
+    private static boolean comparePartitionOwnership(boolean generateOwnedKey, Member member, Partition partition) {
+        final Member owner = partition.getOwner();
+        if (generateOwnedKey) {
+            return member.equals(owner);
+        } else {
+            return !member.equals(owner);
         }
     }
 
@@ -360,4 +413,67 @@ public abstract class HazelcastTestSupport {
         String className = value == null ? "null" : value.getClass().getName();
         return className + "<" + valueString + ">";
     }
+
+    public static boolean isInstanceInSafeState(final HazelcastInstance instance) {
+        final Node node = TestUtil.getNode(instance);
+        if (node != null) {
+            final InternalPartitionService ps = node.getPartitionService();
+            return ps.isMemberStateSafe();
+        } else {
+            return true;
+        }
+    }
+
+    public static void waitInstanceForSafeState(final HazelcastInstance instance) {
+        assertTrueEventually(new AssertTask() {
+            public void run() {
+                isInstanceInSafeState(instance);
+            }
+        });
+    }
+
+    public static boolean isClusterInSafeState(final HazelcastInstance instance) {
+        final PartitionService ps = instance.getPartitionService();
+        return ps.isClusterSafe();
+    }
+
+    public static void waitClusterForSafeState(final HazelcastInstance instance) {
+        assertTrueEventually(new AssertTask() {
+            public void run() {
+                assertTrue(isClusterInSafeState(instance));
+            }
+        });
+    }
+
+    public static boolean isAllInSafeState() {
+        final Set<HazelcastInstance> nodeSet = HazelcastInstanceFactory.getAllHazelcastInstances();
+        final HazelcastInstance[] nodes = nodeSet.toArray(new HazelcastInstance[nodeSet.size()]);
+        return isAllInSafeState(nodes);
+    }
+
+    public static boolean isAllInSafeState(HazelcastInstance[] nodes) {
+        for (HazelcastInstance node : nodes) {
+            if (!isInstanceInSafeState(node)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static void waitAllForSafeState() {
+        assertTrueEventually(new AssertTask() {
+            public void run() {
+                assertTrue(isAllInSafeState());
+            }
+        });
+    }
+
+    public static void waitAllForSafeState(final HazelcastInstance... nodes) {
+        assertTrueEventually(new AssertTask() {
+            public void run() {
+                assertTrue(isAllInSafeState(nodes));
+            }
+        });
+    }
+
 }

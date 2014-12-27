@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 /**
- * Contains classes related to proxy for com.hazelcast.client.txn
+ * Contains classes related to proxy for com.hazelcast.client.client.txn
  */
 package com.hazelcast.client.txn.proxy;

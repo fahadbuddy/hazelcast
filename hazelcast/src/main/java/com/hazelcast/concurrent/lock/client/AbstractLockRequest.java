@@ -16,8 +16,8 @@
 
 package com.hazelcast.concurrent.lock.client;
 
-import com.hazelcast.client.KeyBasedClientRequest;
-import com.hazelcast.client.SecureRequest;
+import com.hazelcast.client.impl.client.KeyBasedClientRequest;
+import com.hazelcast.client.impl.client.SecureRequest;
 import com.hazelcast.concurrent.lock.LockService;
 import com.hazelcast.concurrent.lock.operations.LockOperation;
 import com.hazelcast.nio.ObjectDataInput;
@@ -83,7 +83,7 @@ public abstract class AbstractLockRequest extends KeyBasedClientRequest
         writer.writeLong("timeout", timeout);
 
         ObjectDataOutput out = writer.getRawDataOutput();
-        key.writeData(out);
+        out.writeData(key);
     }
 
     @Override
@@ -93,8 +93,7 @@ public abstract class AbstractLockRequest extends KeyBasedClientRequest
         timeout = reader.readLong("timeout");
 
         ObjectDataInput in = reader.getRawDataInput();
-        key = new Data();
-        key.readData(in);
+        key = in.readData();
     }
 
     @Override

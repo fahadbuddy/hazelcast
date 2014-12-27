@@ -39,17 +39,14 @@ public class DelegatingFuture<V> implements ICompletableFuture<V> {
     private volatile boolean done;
 
     public DelegatingFuture(ICompletableFuture future, SerializationService serializationService) {
-        this.future = future;
-        this.serializationService = serializationService;
-        this.defaultValue = null;
-        this.hasDefaultValue = false;
+        this(future, serializationService, null);
     }
 
     public DelegatingFuture(ICompletableFuture future, SerializationService serializationService, V defaultValue) {
         this.future = future;
         this.serializationService = serializationService;
         this.defaultValue = defaultValue;
-        this.hasDefaultValue = true;
+        this.hasDefaultValue = defaultValue != null;
     }
 
     @Override
@@ -101,7 +98,9 @@ public class DelegatingFuture<V> implements ICompletableFuture<V> {
             return defaultValue;
         }
         if (object instanceof Data) {
-            return serializationService.toObject((Data) object);
+            Data data = (Data) object;
+            object = serializationService.toObject(data);
+            serializationService.disposeData(data);
         }
         return (V) object;
     }
@@ -129,6 +128,10 @@ public class DelegatingFuture<V> implements ICompletableFuture<V> {
 
     protected void setDone() {
         this.done = true;
+    }
+
+    protected ICompletableFuture getFuture() {
+        return future;
     }
 
     @Override

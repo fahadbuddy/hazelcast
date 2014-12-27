@@ -16,10 +16,14 @@
 
 package com.hazelcast.util;
 
-import com.hazelcast.client.ClientEngineImpl;
+import com.hazelcast.client.impl.ClientEngineImpl;
+import com.hazelcast.cluster.impl.ClusterServiceImpl;
 import com.hazelcast.instance.HazelcastInstanceImpl;
 import com.hazelcast.instance.Node;
+import com.hazelcast.instance.OutOfMemoryErrorDispatcher;
 import com.hazelcast.logging.ILogger;
+import com.hazelcast.memory.GarbageCollectorStats;
+import com.hazelcast.memory.MemoryStats;
 import com.hazelcast.nio.ConnectionManager;
 import com.hazelcast.spi.EventService;
 import com.hazelcast.spi.ExecutionService;
@@ -27,12 +31,15 @@ import com.hazelcast.spi.OperationService;
 import com.hazelcast.spi.ProxyService;
 
 import java.lang.management.ManagementFactory;
-import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.ThreadMXBean;
-import java.lang.reflect.Method;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
+import static com.hazelcast.memory.MemoryStatsSupport.freePhysicalMemory;
+import static com.hazelcast.memory.MemoryStatsSupport.freeSwapSpace;
+import static com.hazelcast.memory.MemoryStatsSupport.totalPhysicalMemory;
+import static com.hazelcast.memory.MemoryStatsSupport.totalSwapSpace;
+import static com.hazelcast.util.OperatingSystemMXBeanSupport.readLongAttribute;
 import static java.lang.String.format;
 
 /**
@@ -59,12 +66,13 @@ public class HealthMonitor extends Thread {
     private static final String[] UNITS = new String[]{"", "K", "M", "G", "T", "P", "E"};
     private static final double PERCENTAGE_MULTIPLIER = 100d;
     private static final double THRESHOLD = 70;
+
     private final ILogger logger;
     private final Node node;
     private final Runtime runtime;
-    private final OperatingSystemMXBean osMxBean;
     private final HealthMonitorLevel logLevel;
     private final int delaySeconds;
+    private final ClusterServiceImpl clusterService;
     private final ExecutionService executionService;
     private final EventService eventService;
     private final OperationService operationService;
@@ -80,10 +88,10 @@ public class HealthMonitor extends Thread {
         this.node = hazelcastInstance.node;
         this.logger = node.getLogger(HealthMonitor.class.getName());
         this.runtime = Runtime.getRuntime();
-        this.osMxBean = ManagementFactory.getOperatingSystemMXBean();
         this.logLevel = logLevel;
         this.delaySeconds = delaySeconds;
         this.threadMxBean = ManagementFactory.getThreadMXBean();
+        this.clusterService = node.getClusterService();
         this.executionService = node.nodeEngine.getExecutionService();
         this.eventService = node.nodeEngine.getEventService();
         this.operationService = node.nodeEngine.getOperationService();
@@ -98,35 +106,39 @@ public class HealthMonitor extends Thread {
             return;
         }
 
-        while (node.isActive()) {
-            HealthMetrics metrics;
-            switch (logLevel) {
-                case NOISY:
-                    metrics = new HealthMetrics();
-                    logger.log(Level.INFO, metrics.toString());
-                    break;
-                case SILENT:
-                    metrics = new HealthMetrics();
-                    if (metrics.exceedsThreshold()) {
+        try {
+            while (node.isActive()) {
+                HealthMetrics metrics;
+                switch (logLevel) {
+                    case NOISY:
+                        metrics = new HealthMetrics();
                         logger.log(Level.INFO, metrics.toString());
-                    }
-                    break;
-                default:
-                    throw new IllegalStateException("unrecognized logLevel:" + logLevel);
-            }
+                        break;
+                    case SILENT:
+                        metrics = new HealthMetrics();
+                        if (metrics.exceedsThreshold()) {
+                            logger.log(Level.INFO, metrics.toString());
+                        }
+                        break;
+                    default:
+                        throw new IllegalStateException("unrecognized logLevel:" + logLevel);
+                }
 
-            try {
-                Thread.sleep(TimeUnit.SECONDS.toMillis(delaySeconds));
-            } catch (InterruptedException e) {
-                return;
+                try {
+                    Thread.sleep(TimeUnit.SECONDS.toMillis(delaySeconds));
+                } catch (InterruptedException e) {
+                    return;
+                }
             }
+        } catch (OutOfMemoryError e) {
+            OutOfMemoryErrorDispatcher.onOutOfMemory(e);
         }
     }
 
     /**
      * Health metrics to be logged under load.
      */
-    public class HealthMetrics {
+    private class HealthMetrics {
         private final long memoryFree;
         private final long memoryTotal;
         private final long memoryUsed;
@@ -139,6 +151,7 @@ public class HealthMonitor extends Thread {
         private final double systemCpuLoad;
         private final int threadCount;
         private final int peakThreadCount;
+        private final long clusterTimeDiff;
         private final int asyncExecutorQueueSize;
         private final int clientExecutorQueueSize;
         private final int queryExecutorQueueSize;
@@ -153,6 +166,7 @@ public class HealthMonitor extends Thread {
         private final int proxyCount;
         private final int clientEndpointCount;
         private final int activeConnectionCount;
+        private final int currentClientConnectionCount;
         private final int connectionCount;
         private final int ioExecutorQueueSize;
 
@@ -164,11 +178,12 @@ public class HealthMonitor extends Thread {
             memoryMax = runtime.maxMemory();
             memoryUsedOfTotalPercentage = PERCENTAGE_MULTIPLIER * memoryUsed / memoryTotal;
             memoryUsedOfMaxPercentage = PERCENTAGE_MULTIPLIER * memoryUsed / memoryMax;
-            processCpuLoad = get(osMxBean, "getProcessCpuLoad", -1L);
-            systemLoadAverage = get(osMxBean, "getSystemLoadAverage", -1L);
-            systemCpuLoad = get(osMxBean, "getSystemCpuLoad", -1L);
+            processCpuLoad = readLongAttribute("ProcessCpuLoad", -1L);
+            systemLoadAverage = readLongAttribute("SystemLoadAverage", -1L);
+            systemCpuLoad = readLongAttribute("SystemCpuLoad", -1L);
             threadCount = threadMxBean.getThreadCount();
             peakThreadCount = threadMxBean.getPeakThreadCount();
+            clusterTimeDiff = clusterService.getClusterTimeDiff();
             asyncExecutorQueueSize = executionService.getExecutor(ExecutionService.ASYNC_EXECUTOR).getQueueSize();
             clientExecutorQueueSize = executionService.getExecutor(ExecutionService.CLIENT_EXECUTOR).getQueueSize();
             queryExecutorQueueSize = executionService.getExecutor(ExecutionService.QUERY_EXECUTOR).getQueueSize();
@@ -184,6 +199,7 @@ public class HealthMonitor extends Thread {
             proxyCount = proxyService.getProxyCount();
             clientEndpointCount = clientEngine.getClientEndpointCount();
             activeConnectionCount = connectionManager.getActiveConnectionCount();
+            currentClientConnectionCount = connectionManager.getCurrentClientConnections();
             connectionCount = connectionManager.getConnectionCount();
         }
         //CHECKSTYLE:ON
@@ -206,17 +222,42 @@ public class HealthMonitor extends Thread {
 
         public String toString() {
             StringBuilder sb = new StringBuilder();
-            sb.append("memory.used=").append(numberToUnitRepresentation(memoryUsed)).append(", ");
-            sb.append("memory.free=").append(numberToUnitRepresentation(memoryFree)).append(", ");
-            sb.append("memory.total=").append(numberToUnitRepresentation(memoryTotal)).append(", ");
-            sb.append("memory.max=").append(numberToUnitRepresentation(memoryMax)).append(", ");
-            sb.append("memory.used/total=").append(percentageString(memoryUsedOfTotalPercentage)).append(", ");
-            sb.append("memory.used/max=").append(percentageString(memoryUsedOfMaxPercentage)).append((", "));
+            sb.append("processors=").append(runtime.availableProcessors()).append(", ");
+            sb.append("physical.memory.total=").append(numberToUnit(totalPhysicalMemory())).append(", ");
+            sb.append("physical.memory.free=").append(numberToUnit(freePhysicalMemory())).append(", ");
+            sb.append("swap.space.total=").append(numberToUnit(totalSwapSpace())).append(", ");
+            sb.append("swap.space.free=").append(numberToUnit(freeSwapSpace())).append(", ");
+            sb.append("heap.memory.used=").append(numberToUnit(memoryUsed)).append(", ");
+            sb.append("heap.memory.free=").append(numberToUnit(memoryFree)).append(", ");
+            sb.append("heap.memory.total=").append(numberToUnit(memoryTotal)).append(", ");
+            sb.append("heap.memory.max=").append(numberToUnit(memoryMax)).append(", ");
+            sb.append("heap.memory.used/total=").append(percentageString(memoryUsedOfTotalPercentage)).append(", ");
+            sb.append("heap.memory.used/max=").append(percentageString(memoryUsedOfMaxPercentage)).append((", "));
+
+            MemoryStats memoryStats = node.getNodeExtension().getMemoryStats();
+            if (memoryStats.getMaxNativeMemory() > 0L) {
+                sb.append("native.memory.used=").append(numberToUnit(memoryStats.getUsedNativeMemory())).append(", ");
+                sb.append("native.memory.free=").append(numberToUnit(memoryStats.getFreeNativeMemory())).append(", ");
+                sb.append("native.memory.total=").append(numberToUnit(memoryStats.getCommittedNativeMemory())).append(", ");
+                sb.append("native.memory.max=").append(numberToUnit(memoryStats.getMaxNativeMemory())).append(", ");
+            }
+
+            GarbageCollectorStats gcStats = memoryStats.getGCStats();
+            sb.append("minor.gc.count=").append(gcStats.getMinorCollectionCount()).append(", ");
+            sb.append("minor.gc.time=").append(gcStats.getMinorCollectionTime()).append("ms, ");
+            sb.append("major.gc.count=").append(gcStats.getMajorCollectionCount()).append(", ");
+            sb.append("major.gc.time=").append(gcStats.getMajorCollectionTime()).append("ms, ");
+            if (gcStats.getUnknownCollectionCount() > 0) {
+                sb.append("unknown.gc.count=").append(gcStats.getUnknownCollectionCount()).append(", ");
+                sb.append("unknown.gc.time=").append(gcStats.getUnknownCollectionTime()).append("ms, ");
+            }
+
             sb.append("load.process=").append(format("%.2f", processCpuLoad)).append("%, ");
             sb.append("load.system=").append(format("%.2f", systemCpuLoad)).append("%, ");
             sb.append("load.systemAverage=").append(format("%.2f", systemLoadAverage)).append("%, ");
             sb.append("thread.count=").append(threadCount).append(", ");
             sb.append("thread.peakCount=").append(peakThreadCount).append(", ");
+            sb.append("cluster.timeDiff=").append(clusterTimeDiff).append(", ");
             sb.append("event.q.size=").append(eventQueueSize).append(", ");
             sb.append("executor.q.async.size=").append(asyncExecutorQueueSize).append(", ");
             sb.append("executor.q.client.size=").append(clientExecutorQueueSize).append(", ");
@@ -233,31 +274,9 @@ public class HealthMonitor extends Thread {
             sb.append("proxy.count=").append(proxyCount).append(", ");
             sb.append("clientEndpoint.count=").append(clientEndpointCount).append(", ");
             sb.append("connection.active.count=").append(activeConnectionCount).append(", ");
+            sb.append("client.connection.count=").append(currentClientConnectionCount).append(", ");
             sb.append("connection.count=").append(connectionCount);
             return sb.toString();
-        }
-    }
-
-    private static Long get(OperatingSystemMXBean mbean, String methodName, Long defaultValue) {
-        try {
-            Method method = mbean.getClass().getMethod(methodName);
-            method.setAccessible(true);
-
-            Object value = method.invoke(mbean);
-            if (value == null) {
-                return defaultValue;
-            }
-
-            if (value instanceof Double) {
-                double v = (Double) value;
-                return Math.round(v * PERCENTAGE_MULTIPLIER);
-            }
-
-            return defaultValue;
-        } catch (RuntimeException re) {
-            throw re;
-        } catch (Exception e) {
-            return defaultValue;
         }
     }
 
@@ -265,7 +284,7 @@ public class HealthMonitor extends Thread {
         return format("%.2f", p) + "%";
     }
 
-    public static String numberToUnitRepresentation(long number) {
+    public static String numberToUnit(long number) {
         //CHECKSTYLE:OFF
         for (int i = 6; i > 0; i--) {
             double step = Math.pow(1024, i); // 1024 is for 1024 kb is 1 MB etc

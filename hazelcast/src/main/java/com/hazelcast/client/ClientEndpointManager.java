@@ -1,126 +1,88 @@
 package com.hazelcast.client;
 
-import com.hazelcast.logging.ILogger;
-import com.hazelcast.logging.Logger;
 import com.hazelcast.nio.Connection;
-import com.hazelcast.spi.NodeEngine;
-import com.hazelcast.util.UuidUtil;
 
-import javax.security.auth.login.LoginException;
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
 
 /**
- * ClientEndpoints are stored and managed thorough this class.
+ * A manager for {@link com.hazelcast.client.ClientEndpoint}s.
+ *
+ * All the methods are thread-safe.
  */
-public class ClientEndpointManager {
+public interface ClientEndpointManager {
 
-    private static final ILogger LOGGER = Logger.getLogger(ClientEndpointManager.class);
-    private static final int DESTROY_ENDPOINT_DELAY_MS = 1111;
-    private final ClientEngineImpl clientEngine;
-    private final NodeEngine nodeEngine;
-    private final ConcurrentMap<Connection, ClientEndpoint> endpoints =
-            new ConcurrentHashMap<Connection, ClientEndpoint>();
+    /**
+     * Returns the current endpoints.
+     *
+     * @return the endpoints.
+     */
+    Collection<ClientEndpoint> getEndpoints();
 
-    public ClientEndpointManager(ClientEngineImpl clientEngine, NodeEngine nodeEngine) {
-        this.clientEngine = clientEngine;
-        this.nodeEngine = nodeEngine;
-    }
+    /**
+     * Gets the endpoint for a given connection.
+     *
+     * @param connection the connection to the endpoint.
+     * @return the found endpoint or null of no endpoint was found.
+     * @throws java.lang.NullPointerException if connection is null.
+     */
+    ClientEndpoint getEndpoint(Connection connection);
 
+    /**
+     * Gets all the endpoints for a given client.
+     *
+     * @param clientUuid the uuid of the client
+     * @return a set of all the endpoints for the client. If no endpoints are found, an empty set is returned.
+     * @throws java.lang.NullPointerException if clientUuid is null.
+     */
+    Set<ClientEndpoint> getEndpoints(String clientUuid);
 
-    Set<ClientEndpoint> getEndpoints(String uuid) {
-        Set<ClientEndpoint> endpointSet = new HashSet<ClientEndpoint>();
-        for (ClientEndpoint endpoint : endpoints.values()) {
-            if (uuid.equals(endpoint.getUuid())) {
-                endpointSet.add(endpoint);
-            }
-        }
-        return endpointSet;
-    }
+    /**
+     * Returns the current number of endpoints.
+     *
+     * @return the current number of endpoints.
+     */
+    int size();
 
+    /**
+     * Removes all endpoints. Nothing is done on the endpoints themselves; they are just removed from this ClientEndpointManager.
+     *
+     * Can safely be called when there are no endpoints.
+     */
+    void clear();
 
-    ClientEndpoint getEndpoint(Connection conn) {
-        return endpoints.get(conn);
-    }
+    /**
+     * Registers an endpoint with this ClientEndpointManager.
+     *
+     * If the endpoint already is registered, the call is ignored.
+     *
+     * @param endpoint the endpoint to register.
+     * @throws java.lang.NullPointerException if endpoint is null.
+     */
+    void registerEndpoint(ClientEndpoint endpoint);
 
-    ClientEndpoint createEndpoint(Connection conn) {
-        if (!conn.live()) {
-            LOGGER.severe("Can't create and endpoint for a dead connection");
-            return null;
-        }
+    /**
+     * Removes an endpoint from this ClientEndpointManager. This method doesn't close the endpoint.
+     *
+     * todo: what happens when the endpoint already is removed
+     * todo: what happens when the endpoint was never registered
+     *
+     * @param endpoint the endpoint to remove.
+     * @throws java.lang.NullPointerException if endpoint is null.
+     * @see #removeEndpoint(ClientEndpoint, boolean)
+     */
+    void removeEndpoint(ClientEndpoint endpoint);
 
-        String clientUuid = UuidUtil.createClientUuid(conn.getEndPoint());
-        ClientEndpoint endpoint = new ClientEndpoint(clientEngine, conn, clientUuid);
-        if (endpoints.putIfAbsent(conn, endpoint) != null) {
-            LOGGER.severe("An endpoint already exists for connection:" + conn);
-        }
-        return endpoint;
-    }
-
-    void removeEndpoint(final ClientEndpoint endpoint) {
-        removeEndpoint(endpoint, false);
-    }
-
-    void removeEndpoint(final ClientEndpoint endpoint, boolean closeImmediately) {
-        endpoints.remove(endpoint.getConnection());
-        LOGGER.info("Destroying " + endpoint);
-        try {
-            endpoint.destroy();
-        } catch (LoginException e) {
-            LOGGER.warning(e);
-        }
-
-        final Connection connection = endpoint.getConnection();
-        if (closeImmediately) {
-            try {
-                connection.close();
-            } catch (Throwable e) {
-                LOGGER.warning("While closing client connection: " + connection, e);
-            }
-        } else {
-            nodeEngine.getExecutionService().schedule(new Runnable() {
-                public void run() {
-                    if (connection.live()) {
-                        try {
-                            connection.close();
-                        } catch (Throwable e) {
-                            LOGGER.warning("While closing client connection: " + e.toString());
-                        }
-                    }
-                }
-            }, DESTROY_ENDPOINT_DELAY_MS, TimeUnit.MILLISECONDS);
-        }
-        clientEngine.sendClientEvent(endpoint);
-    }
-
-    void removeEndpoints(String memberUuid) {
-        Iterator<ClientEndpoint> iterator = endpoints.values().iterator();
-        while (iterator.hasNext()) {
-            ClientEndpoint endpoint = iterator.next();
-            String ownerUuid = endpoint.getPrincipal().getOwnerUuid();
-            if (memberUuid.equals(ownerUuid)) {
-                iterator.remove();
-                removeEndpoint(endpoint, true);
-            }
-        }
-    }
-
-    void clear() {
-        endpoints.clear();
-
-    }
-
-    Collection<ClientEndpoint> getEndpoints() {
-        return endpoints.values();
-    }
-
-    int size() {
-        return endpoints.size();
-    }
-
+    /**
+     * Removes an endpoint and optionally closes it immediately.
+     *
+     * todo: what happens when the endpoint already is removed
+     * todo: what happens when the endpoint was never registered
+     *
+     * @param endpoint the endpoint to remove.
+     * @param closeImmediately if the endpoint is immediately closed.
+     * @throws java.lang.NullPointerException if endpoint is null.
+     * @see #removeEndpoint(ClientEndpoint)
+     */
+    void removeEndpoint(ClientEndpoint endpoint, boolean closeImmediately);
 }

@@ -16,7 +16,7 @@
 
 package com.hazelcast.nio.serialization;
 
-abstract class BinaryClassDefinition implements ClassDefinition {
+public abstract class BinaryClassDefinition implements ClassDefinition {
 
     int factoryId;
     int classId;
@@ -39,6 +39,7 @@ abstract class BinaryClassDefinition implements ClassDefinition {
         return version;
     }
 
+    @edu.umd.cs.findbugs.annotations.SuppressWarnings("EI_EXPOSE_REP")
     public final byte[] getBinary() {
         return binary;
     }

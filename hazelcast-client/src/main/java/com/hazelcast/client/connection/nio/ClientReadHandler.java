@@ -26,7 +26,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 
-public class ClientReadHandler extends ClientAbstractSelectionHandler {
+public class ClientReadHandler extends AbstractClientSelectionHandler {
 
     private final ByteBuffer buffer;
 
@@ -37,10 +37,10 @@ public class ClientReadHandler extends ClientAbstractSelectionHandler {
     public ClientReadHandler(ClientConnection connection, IOSelector ioSelector, int bufferSize) {
         super(connection, ioSelector);
         buffer = ByteBuffer.allocate(bufferSize);
+        lastHandle = Clock.currentTimeMillis();
     }
 
     @Override
-
     public void run() {
         registerOp(SelectionKey.OP_READ);
     }
@@ -48,7 +48,7 @@ public class ClientReadHandler extends ClientAbstractSelectionHandler {
     @Override
     public void handle() {
         lastHandle = Clock.currentTimeMillis();
-        if (!connection.live()) {
+        if (!connection.isAlive()) {
             if (logger.isFinestEnabled()) {
                 String message = "We are being asked to read, but connection is not live so we won't";
                 logger.finest(message);

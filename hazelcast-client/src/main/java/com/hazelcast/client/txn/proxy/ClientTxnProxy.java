@@ -16,10 +16,10 @@
 
 package com.hazelcast.client.txn.proxy;
 
-import com.hazelcast.client.ClientDestroyRequest;
-import com.hazelcast.client.ClientRequest;
+import com.hazelcast.client.impl.client.ClientDestroyRequest;
+import com.hazelcast.client.impl.client.ClientRequest;
 import com.hazelcast.client.spi.impl.ClientInvocationServiceImpl;
-import com.hazelcast.client.txn.BaseTransactionRequest;
+import com.hazelcast.transaction.client.BaseTransactionRequest;
 import com.hazelcast.client.txn.TransactionContextProxy;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.nio.serialization.SerializationService;
@@ -29,9 +29,6 @@ import com.hazelcast.util.ExceptionUtil;
 
 import java.util.concurrent.Future;
 
-/**
- * @author ali 6/10/13
- */
 abstract class ClientTxnProxy implements TransactionalObject {
 
     final String objectName;
@@ -60,16 +57,19 @@ abstract class ClientTxnProxy implements TransactionalObject {
 
     abstract void onDestroy();
 
+    @Override
     public final void destroy() {
         onDestroy();
         ClientDestroyRequest request = new ClientDestroyRequest(objectName, getServiceName());
         invoke(request);
     }
 
+    @Override
     public Object getId() {
         return objectName;
     }
 
+    @Override
     public String getPartitionKey() {
         return StringPartitioningStrategy.getPartitionKey(getName());
     }

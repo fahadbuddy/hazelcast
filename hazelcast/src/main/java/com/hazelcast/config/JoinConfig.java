@@ -30,15 +30,15 @@ public class JoinConfig {
     private AwsConfig awsConfig = new AwsConfig();
 
     /**
-     * @return the multicastConfig
+     * @return the multicastConfig join configuration
      */
     public MulticastConfig getMulticastConfig() {
         return multicastConfig;
     }
 
     /**
-     * @param multicastConfig the multicastConfig to set
-     * @throws IllegalArgumentException if multicastConfig is null.
+     * @param multicastConfig the multicastConfig join configuration to set
+     * @throws IllegalArgumentException if multicastConfig is null
      */
     public JoinConfig setMulticastConfig(final MulticastConfig multicastConfig) {
         this.multicastConfig = isNotNull(multicastConfig, "multicastConfig");
@@ -53,8 +53,8 @@ public class JoinConfig {
     }
 
     /**
-     * @param tcpIpConfig the tcpIpConfig to set
-     * @throws IllegalArgumentException if tcpIpConfig is null.
+     * @param tcpIpConfig the tcpIpConfig join configuration to set
+     * @throws IllegalArgumentException if tcpIpConfig is null
      */
     public JoinConfig setTcpIpConfig(final TcpIpConfig tcpIpConfig) {
         this.tcpIpConfig = isNotNull(tcpIpConfig, "tcpIpConfig");
@@ -62,19 +62,38 @@ public class JoinConfig {
     }
 
     /**
-     * @return the awsConfig
+     * @return the awsConfig join configuration
      */
     public AwsConfig getAwsConfig() {
         return awsConfig;
     }
 
     /**
-     * @param awsConfig the AwsConfig to set
-     * @throws IllegalArgumentException if awsConfig is null.
+     * @param awsConfig the AwsConfig join configuration to set
+     * @throws IllegalArgumentException if awsConfig is null
      */
     public JoinConfig setAwsConfig(final AwsConfig awsConfig) {
         this.awsConfig = isNotNull(awsConfig, "awsConfig");
         return this;
+    }
+
+    /**
+     * Verifies this JoinConfig is valid. At most a single joiner should be active.
+     *
+     * @throws IllegalStateException when the join config is not valid.
+     */
+    public void verify() {
+        if (getTcpIpConfig().isEnabled() && getMulticastConfig().isEnabled()) {
+            throw new IllegalStateException("TCP/IP and Multicast join be enabled at the same time");
+        }
+
+        if (getTcpIpConfig().isEnabled() && getAwsConfig().isEnabled()) {
+            throw new IllegalStateException("TCP/IP and AWS join can't be enabled at the same time");
+        }
+
+        if (getMulticastConfig().isEnabled() && getAwsConfig().isEnabled()) {
+            throw new IllegalStateException("Multicast and AWS join can't be enabled at the same time");
+        }
     }
 
     @Override

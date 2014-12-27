@@ -55,6 +55,12 @@ public class MapConfig {
     public static final int MAX_EVICTION_PERCENTAGE = 100;
 
     /**
+     * Minimum time in milliseconds which should pass before asking
+     * if a partition of this map is evictable or not.
+     */
+    public static final long DEFAULT_MIN_EVICTION_CHECK_MILLIS = 100L;
+
+    /**
      * The number of default Time to Live seconds
      */
     public static final int DEFAULT_TTL_SECONDS = 0;
@@ -63,10 +69,7 @@ public class MapConfig {
      * The number of default time to wait eviction
      */
     public static final int DEFAULT_MAX_IDLE_SECONDS = 0;
-    /**
-     * Maximum size
-     */
-    public static final int DEFAULT_MAX_SIZE = Integer.MAX_VALUE;
+
     /**
      * Default policy for eviction
      */
@@ -87,6 +90,8 @@ public class MapConfig {
     private int asyncBackupCount = MIN_BACKUP_COUNT;
 
     private int evictionPercentage = DEFAULT_EVICTION_PERCENTAGE;
+
+    private long minEvictionCheckMillis = DEFAULT_MIN_EVICTION_CHECK_MILLIS;
 
     private int timeToLiveSeconds = DEFAULT_TTL_SECONDS;
 
@@ -120,24 +125,6 @@ public class MapConfig {
 
     private MapConfigReadOnly readOnly;
 
-    /**
-     * Eviction Policy enum
-     */
-    public enum EvictionPolicy {
-        /**
-         * Least Recently Used
-         */
-        LRU,
-        /**
-         * Least Frequently Used
-         */
-        LFU,
-        /**
-         * None
-         */
-        NONE
-    }
-
     public MapConfig(String name) {
         this.name = name;
     }
@@ -150,6 +137,7 @@ public class MapConfig {
         this.backupCount = config.backupCount;
         this.asyncBackupCount = config.asyncBackupCount;
         this.evictionPercentage = config.evictionPercentage;
+        this.minEvictionCheckMillis = config.minEvictionCheckMillis;
         this.timeToLiveSeconds = config.timeToLiveSeconds;
         this.maxIdleSeconds = config.maxIdleSeconds;
         this.maxSizeConfig = config.maxSizeConfig != null ? new MaxSizeConfig(config.maxSizeConfig) : null;
@@ -176,14 +164,18 @@ public class MapConfig {
     }
 
     /**
-     * @return the name
+     * Returns the name of this {@link com.hazelcast.core.IMap}
+     *
+     * @return the name of the {@link com.hazelcast.core.IMap}
      */
     public String getName() {
         return name;
     }
 
     /**
-     * @param name the name to set
+     * Sets the name of the {@link com.hazelcast.core.IMap}
+     *
+     * @param name the name to set for this {@link com.hazelcast.core.IMap}
      */
     public MapConfig setName(String name) {
         this.name = name;
@@ -191,6 +183,8 @@ public class MapConfig {
     }
 
     /**
+     * Returns the data type that will be used for storing records.
+     *
      * @return data type that will be used for storing records.
      */
     public InMemoryFormat getInMemoryFormat() {
@@ -198,11 +192,11 @@ public class MapConfig {
     }
 
     /**
-     * Data type that will be used for storing records.
+     * Binary type that will be used for storing records.
      * Possible values:
      * BINARY (default): keys and values will be stored as binary data
      * OBJECT : values will be stored in their object forms
-     * OFFHEAP : values will be stored in non-heap region of JVM
+     * NATIVE : values will be stored in non-heap region of JVM
      *
      * @param inMemoryFormat the record type to set
      * @throws IllegalArgumentException if inMemoryFormat is null.
@@ -213,7 +207,9 @@ public class MapConfig {
     }
 
     /**
-     * @return the backupCount
+     * Returns the backupCount for this {@link com.hazelcast.core.IMap}
+     *
+     * @return the backupCount for this {@link com.hazelcast.core.IMap}
      * @see #getAsyncBackupCount()
      */
     public int getBackupCount() {
@@ -225,7 +221,7 @@ public class MapConfig {
      * then all entries of the map will be copied to another JVM for
      * fail-safety. 0 means no sync backup.
      *
-     * @param backupCount the backupCount to set
+     * @param backupCount the backupCount to set for this {@link com.hazelcast.core.IMap}
      * @see #setAsyncBackupCount(int)
      */
     public MapConfig setBackupCount(final int backupCount) {
@@ -242,6 +238,8 @@ public class MapConfig {
     }
 
     /**
+     * Returns the asynchronous backup count.
+     *
      * @return the asyncBackupCount
      * @see #setBackupCount(int)
      */
@@ -250,7 +248,7 @@ public class MapConfig {
     }
 
     /**
-     * Number of asynchronous backups.
+     * Sets the number of asynchronous backups.
      * 0 means no backup.
      *
      * @param asyncBackupCount the asyncBackupCount to set
@@ -269,23 +267,30 @@ public class MapConfig {
         return this;
     }
 
+    /**
+     * Returns the total number of backups: backupCount plus asyncBackupCount.
+     *
+     * @return the total number of backups: backupCount plus asyncBackupCount
+     */
     public int getTotalBackupCount() {
         return backupCount + asyncBackupCount;
     }
 
     /**
-     * @return the evictionPercentage
+     * Returns the evictionPercentage: specified percentage of the map to be evicted
+     *
+     * @return the evictionPercentage: specified percentage of the map to be evicted
      */
     public int getEvictionPercentage() {
         return evictionPercentage;
     }
 
     /**
-     * When max. size is reached, specified percentage of the map will be evicted.
+     * When maximum size is reached, the specified percentage of the map will be evicted.
      * Any integer between 0 and 100 is allowed.
-     * If 25 is set for example, 25% of the entries will get evicted.
+     * For example, if 25 is set, 25% of the entries will be evicted.
      *
-     * @param evictionPercentage the evictionPercentage to set
+     * @param evictionPercentage the evictionPercentage to set: the specified percentage of the map to be evicted
      * @throws IllegalArgumentException if evictionPercentage is not in the 0-100 range.
      */
     public MapConfig setEvictionPercentage(final int evictionPercentage) {
@@ -300,16 +305,46 @@ public class MapConfig {
     }
 
     /**
-     * @return the timeToLiveSeconds
+     * Returns the minimum milliseconds which should pass before asking if a partition of this map is evictable or not.
+     * <p/>
+     * Default value is {@value #DEFAULT_MIN_EVICTION_CHECK_MILLIS} milliseconds.
+     *
+     * @return number of milliseconds that should pass before asking for the next eviction.
+     * @since 3.3
+     */
+    public long getMinEvictionCheckMillis() {
+        return minEvictionCheckMillis;
+    }
+
+    /**
+     * Sets the minimum time in milliseconds which should pass before asking if a partition of this map is evictable or not.
+     * <p/>
+     * Default value is {@value #DEFAULT_MIN_EVICTION_CHECK_MILLIS} milliseconds.
+     *
+     * @param minEvictionCheckMillis time in milliseconds that should pass before asking for the next eviction
+     * @since 3.3
+     */
+    public MapConfig setMinEvictionCheckMillis(long minEvictionCheckMillis) {
+        if (minEvictionCheckMillis < 0) {
+            throw new IllegalArgumentException("Parameter minEvictionCheckMillis can not get a negative value");
+        }
+        this.minEvictionCheckMillis = minEvictionCheckMillis;
+        return this;
+    }
+
+    /**
+     * Returns the maximum number of seconds for each entry to stay in the map.
+     *
+     * @return the maximum number of seconds for each entry to stay in the map
      */
     public int getTimeToLiveSeconds() {
         return timeToLiveSeconds;
     }
 
     /**
-     * Maximum number of seconds for each entry to stay in the map. Entries that are
-     * older than timeToLiveSeconds will get automatically evicted from the map.
-     * Updates on the entry don't change the eviction time.
+     * The maximum number of seconds for each entry to stay in the map. Entries that are
+     * older than timeToLiveSeconds will be automatically evicted from the map.
+     * Updates on the entry do not change the eviction time.
      * Any integer between 0 and Integer.MAX_VALUE.
      * 0 means infinite. Default is 0.
      *
@@ -321,7 +356,9 @@ public class MapConfig {
     }
 
     /**
-     * @return the maxIdleSeconds
+     * Returns the maximum number of seconds for each entry to stay idle in the map.
+     *
+     * @return the maximum number of seconds for each entry to stay idle in the map
      */
     public int getMaxIdleSeconds() {
         return maxIdleSeconds;
@@ -330,12 +367,12 @@ public class MapConfig {
     /**
      * Maximum number of seconds for each entry to stay idle in the map. Entries that are
      * idle(not touched) for more than maxIdleSeconds will get
-     * automatically evicted from the map. Entry is touched if get, put or
+     * automatically evicted from the map. Entry is touched if get, getAll, put or
      * containsKey is called.
      * Any integer between 0 and Integer.MAX_VALUE.
      * 0 means infinite. Default is 0.
      *
-     * @param maxIdleSeconds the maxIdleSeconds to set
+     * @param maxIdleSeconds the maxIdleSeconds (the maximum number of seconds for each entry to stay idle in the map) to set
      */
     public MapConfig setMaxIdleSeconds(int maxIdleSeconds) {
         this.maxIdleSeconds = maxIdleSeconds;
@@ -352,6 +389,8 @@ public class MapConfig {
     }
 
     /**
+     * Returns the evictionPolicy
+     *
      * @return the evictionPolicy
      */
     public EvictionPolicy getEvictionPolicy() {
@@ -359,6 +398,8 @@ public class MapConfig {
     }
 
     /**
+     * Sets the evictionPolicy
+     *
      * @param evictionPolicy the evictionPolicy to set
      */
     public MapConfig setEvictionPolicy(EvictionPolicy evictionPolicy) {
@@ -369,16 +410,16 @@ public class MapConfig {
     /**
      * Returns the map store configuration
      *
-     * @return the mapStoreConfig
+     * @return the mapStoreConfig (map store configuration)
      */
     public MapStoreConfig getMapStoreConfig() {
         return mapStoreConfig;
     }
 
     /**
-     * Sets the mapStore configuration
+     * Sets the map store configuration
      *
-     * @param mapStoreConfig the mapStoreConfig to set
+     * @param mapStoreConfig the mapStoreConfig (map store configuration) to set
      */
     public MapConfig setMapStoreConfig(MapStoreConfig mapStoreConfig) {
         this.mapStoreConfig = mapStoreConfig;
@@ -495,6 +536,7 @@ public class MapConfig {
                 && this.backupCount == other.backupCount
                 && this.asyncBackupCount == other.asyncBackupCount
                 && this.evictionPercentage == other.evictionPercentage
+                && this.minEvictionCheckMillis == other.minEvictionCheckMillis
                 && this.maxIdleSeconds == other.maxIdleSeconds
                 && (this.maxSizeConfig.getSize() == other.maxSizeConfig.getSize()
                 || (Math.min(maxSizeConfig.getSize(), other.maxSizeConfig.getSize()) == 0
@@ -510,6 +552,7 @@ public class MapConfig {
         result = prime * result + this.backupCount;
         result = prime * result + this.asyncBackupCount;
         result = prime * result + this.evictionPercentage;
+        result = prime * result + (int) (minEvictionCheckMillis ^ (minEvictionCheckMillis >>> 32));
         result = prime
                 * result
                 + ((this.evictionPolicy == null) ? 0 : this.evictionPolicy
@@ -548,6 +591,7 @@ public class MapConfig {
                         && this.backupCount == other.backupCount
                         && this.asyncBackupCount == other.asyncBackupCount
                         && this.evictionPercentage == other.evictionPercentage
+                        && this.minEvictionCheckMillis == other.minEvictionCheckMillis
                         && this.maxIdleSeconds == other.maxIdleSeconds
                         && this.maxSizeConfig.getSize() == other.maxSizeConfig.getSize()
                         && this.timeToLiveSeconds == other.timeToLiveSeconds
@@ -575,6 +619,7 @@ public class MapConfig {
         sb.append(", maxIdleSeconds=").append(maxIdleSeconds);
         sb.append(", evictionPolicy='").append(evictionPolicy).append('\'');
         sb.append(", evictionPercentage=").append(evictionPercentage);
+        sb.append(", minEvictionCheckMillis=").append(minEvictionCheckMillis);
         sb.append(", maxSizeConfig=").append(maxSizeConfig);
         sb.append(", readBackupData=").append(readBackupData);
         sb.append(", nearCacheConfig=").append(nearCacheConfig);

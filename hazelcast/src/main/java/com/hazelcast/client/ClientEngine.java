@@ -25,8 +25,12 @@ import com.hazelcast.partition.InternalPartitionService;
 import com.hazelcast.security.SecurityContext;
 import com.hazelcast.spi.EventService;
 import com.hazelcast.spi.ProxyService;
-import com.hazelcast.transaction.TransactionManagerService;
 
+/**
+ * The client Engine.
+ *
+ * todo: what is the purpose of the client engine.
+ */
 public interface ClientEngine {
 
     int getClientEndpointCount();
@@ -36,8 +40,6 @@ public interface ClientEngine {
     ClusterService getClusterService();
 
     EventService getEventService();
-
-    TransactionManagerService getTransactionManagerService();
 
     ProxyService getProxyService();
 
@@ -52,5 +54,4 @@ public interface ClientEngine {
     MemberImpl getLocalMember();
 
     SecurityContext getSecurityContext();
-
 }

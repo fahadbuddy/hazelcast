@@ -17,8 +17,8 @@
 package com.hazelcast.concurrent.atomicreference.client;
 
 import com.hazelcast.client.ClientEngine;
-import com.hazelcast.client.PartitionClientRequest;
-import com.hazelcast.client.SecureRequest;
+import com.hazelcast.client.impl.client.PartitionClientRequest;
+import com.hazelcast.client.impl.client.SecureRequest;
 import com.hazelcast.concurrent.atomicreference.AtomicReferenceService;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
@@ -31,9 +31,6 @@ import com.hazelcast.security.permission.AtomicReferencePermission;
 
 import java.io.IOException;
 import java.security.Permission;
-
-import static com.hazelcast.nio.IOUtil.readNullableData;
-import static com.hazelcast.nio.IOUtil.writeNullableData;
 
 public abstract class ModifyRequest extends PartitionClientRequest implements Portable, SecureRequest {
 
@@ -69,14 +66,14 @@ public abstract class ModifyRequest extends PartitionClientRequest implements Po
     public void write(PortableWriter writer) throws IOException {
         writer.writeUTF("n", name);
         ObjectDataOutput out = writer.getRawDataOutput();
-        writeNullableData(out, update);
+        out.writeData(update);
     }
 
     @Override
     public void read(PortableReader reader) throws IOException {
         name = reader.readUTF("n");
         ObjectDataInput in = reader.getRawDataInput();
-        update = readNullableData(in);
+        update = in.readData();
     }
 
     @Override

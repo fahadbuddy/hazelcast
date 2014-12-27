@@ -26,7 +26,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class ClientWriteHandler extends ClientAbstractSelectionHandler implements Runnable {
+public class ClientWriteHandler extends AbstractClientSelectionHandler implements Runnable {
 
     private final Queue<SocketWritable> writeQueue = new ConcurrentLinkedQueue<SocketWritable>();
 
@@ -40,8 +40,6 @@ public class ClientWriteHandler extends ClientAbstractSelectionHandler implement
 
     private volatile long lastHandle;
 
-//    private boolean initialized = false;
-
     public ClientWriteHandler(ClientConnection connection, IOSelector ioSelector, int bufferSize) {
         super(connection, ioSelector);
         buffer = ByteBuffer.allocate(bufferSize);
@@ -50,15 +48,9 @@ public class ClientWriteHandler extends ClientAbstractSelectionHandler implement
     @Override
     public void handle() {
         lastHandle = Clock.currentTimeMillis();
-        if (!connection.live()) {
+        if (!connection.isAlive()) {
             return;
         }
-//        if (!initialized) {
-//            initialized = true;
-//            buffer.put(Protocols.CLIENT_BINARY.getBytes());
-//            buffer.put(ClientTypes.JAVA.getBytes());
-//            registerWrite();
-//        }
 
         if (lastWritable == null) {
             lastWritable = poll();

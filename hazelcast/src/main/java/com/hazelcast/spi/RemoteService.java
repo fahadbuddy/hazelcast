@@ -26,7 +26,18 @@ import com.hazelcast.core.DistributedObject;
  */
 public interface RemoteService {
 
+    /**
+     * Creates a distributed object.
+     *
+     * @param objectName the name for the created distributed object
+     * @return the created distributed object
+     */
     DistributedObject createDistributedObject(String objectName);
 
+    /**
+     * Destroys a distributed object.
+     *
+     * @param objectName the name of the distributed object to destroy
+     */
     void destroyDistributedObject(String objectName);
 }

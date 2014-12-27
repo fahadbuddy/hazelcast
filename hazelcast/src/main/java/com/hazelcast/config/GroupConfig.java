@@ -67,18 +67,18 @@ public final class GroupConfig {
     }
 
     /**
-     * Gets the name of the group.
+     * Gets the group name of the group.
      *
-     * @return the name
+     * @return the name of the group
      */
     public String getName() {
         return name;
     }
 
     /**
-     * Sets the group name.
+     * Sets the group name of the group.
      *
-     * @param name the name to set
+     * @param name the name to set for the group
      * @return the updated GroupConfig.
      * @throws IllegalArgumentException if name is null.
      */
@@ -88,18 +88,18 @@ public final class GroupConfig {
     }
 
     /**
-     * Gets the password to connec to to the group.
+     * Gets the password of the group.
      *
-     * @return the password
+     * @return the password of the group
      */
     public String getPassword() {
         return password;
     }
 
     /**
-     * Sets the password.
+     * Sets the password for the group.
      *
-     * @param password the password to set
+     * @param password the password to set for the group
      * @return the updated GroupConfig.
      * @throws IllegalArgumentException if password is null.
      */
